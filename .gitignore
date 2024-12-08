@@ -88,10 +88,5 @@ ENV/
 # Rope project settings
 .ropeproject
 
-# 
+# Project ignores
 data/
-data_check_IDENTITY/
-data_check_INVERSE/
-data_public_IDENTITY/
-models/
-old_files/
