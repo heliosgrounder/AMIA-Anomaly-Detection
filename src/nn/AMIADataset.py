@@ -78,7 +78,7 @@ class AMIADataset(Dataset):
 
         boxes = BoundingBoxes(boxes, format="xyxy", canvas_size=torch.Size(img_size))
 
-        # transform part (incomplete)
+        # transform part
         if self.transform:
             transformed = self.transform(image=image, bboxes=boxes, labels=labels)
             image = transformed["image"]
