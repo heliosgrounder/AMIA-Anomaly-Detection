@@ -44,10 +44,9 @@ class AMIADataset(Dataset):
             self.images_path.append(os.path.join(data_folder, "train", "train", image_filename))
 
     def __len__(self):
-        return len(self.images_info)
+        return len(self.images_path)
 
     def __getitem__(self, idx):
-
         image_path = self.images_path[idx]
         image_uuid = os.path.splitext(os.path.basename(image_path))[0]
         img_size = self.df_img_size.loc[image_uuid].to_list()
@@ -60,21 +59,35 @@ class AMIADataset(Dataset):
         if set(annotations["class_id"]) == {14}:
             labels.append(14)
         else:
-            for idx in range(annotations.index.size):
-                anno_temp = annotations.iloc[idx][["class_id", "x_min", "y_min", "x_max", "y_max"]].to_list()
-                labels.append(anno_temp[0])
-                boxes.append(anno_temp[1:])
+            merged_annotations = (
+                annotations.groupby("class_id")
+                .agg({
+                    "x_min": "mean",
+                    "y_min": "mean",
+                    "x_max": "mean",
+                    "y_max": "mean"
+                })
+                .reset_index()
+            )
+            for _, row in merged_annotations.iterrows():
+                labels.append(int(row["class_id"]))
+                boxes.append([row["x_min"], row["y_min"], row["x_max"], row["y_max"]])
+
         boxes = torch.tensor(boxes, dtype=torch.float32)
         labels = torch.tensor(labels, dtype=torch.int8)
 
-        bbox = BoundingBoxes(boxes, format="xyxy", canvas_size=torch.Size(img_size))
+        boxes = BoundingBoxes(boxes, format="xyxy", canvas_size=torch.Size(img_size))
 
         # transform part (incomplete)
-
+        if self.transform:
+            transformed = self.transform(image=image, bboxes=boxes, labels=labels)
+            image = transformed["image"]
+            boxes = transformed["bboxes"]
+            labels = transformed["labels"]
 
         target = {
-            "label": labels,
-            "bbox": bbox
+            "labels": labels,
+            "boxes": boxes
         }
 
         return image, target
