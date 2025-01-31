@@ -6,6 +6,7 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset
 from torchvision.tv_tensors import BoundingBoxes
+import torchvision.transforms as T
 
 
 class AMIADataset(Dataset):
@@ -87,4 +88,9 @@ class AMIADataset(Dataset):
                 image = self.transform(image)
             
             return image, image_uuid
-            
+
+
+def get_transform():
+    return T.Compose([
+        T.ToTensor()
+    ])
