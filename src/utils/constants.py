@@ -1,3 +1,5 @@
+import torch
+
 LABELS = {
     0: "Aortic enlargement",
     1: "Atelectasis",
@@ -15,3 +17,5 @@ LABELS = {
     13: "Pulmonary fibrosis",
     14: "No finding"
 }
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
