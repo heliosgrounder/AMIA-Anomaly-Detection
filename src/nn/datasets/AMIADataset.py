@@ -76,18 +76,14 @@ class AMIADataset(Dataset):
             if self.transform:
                 image = self.transform(image)
 
-            target = {
+            output = {
+                "image": image,
                 "boxes": boxes,
-                "labels": labels
+                "labels": labels,
+                "image_uuid": image_uuid
             }
 
-            return image, target
-        else:
-            # transform part
-            if self.transform:
-                image = self.transform(image)
-            
-            return image, image_uuid
+            return output
 
 
 def get_transform():
