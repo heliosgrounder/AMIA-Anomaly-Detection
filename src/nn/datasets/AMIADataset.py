@@ -76,14 +76,13 @@ class AMIADataset(Dataset):
             if self.transform:
                 image = self.transform(image)
 
-            output = {
-                "image": image,
+            target = {
                 "boxes": boxes,
                 "labels": labels,
-                "image_uuid": image_uuid
+                # "image_uuid": torch.tensor([image_uuid])
             }
 
-            return output
+            return image, target
 
 
 def get_transform():
