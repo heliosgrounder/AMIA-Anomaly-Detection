@@ -81,8 +81,12 @@ class AMIADataset(Dataset):
                 "labels": labels,
                 # "image_uuid": torch.tensor([image_uuid])
             }
-
+        
             return image, target
+        else:
+            if self.transform:
+                image = self.transform(image)
+            return image, image_uuid
 
 
 def get_transform():
