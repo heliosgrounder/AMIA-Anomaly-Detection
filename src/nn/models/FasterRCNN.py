@@ -16,5 +16,5 @@ class FasterRCNN(nn.Module):
         in_features = self.backbone.roi_heads.box_predictor.cls_score.in_features
         self.backbone.roi_heads.box_predictor = torchvision.models.detection.faster_rcnn.FastRCNNPredictor(in_features, num_classes=self.num_classes)
 
-    def forward(self, images, targets):
+    def forward(self, images, targets=None):
         return self.backbone(images, targets)
