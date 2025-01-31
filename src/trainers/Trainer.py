@@ -88,8 +88,11 @@ class Trainer:
         return avg_loss
 
     def fit(self, num_epochs=10):
+        best_loss = float("inf")
         for epoch in range(num_epochs):
             train_loss = self.train_model()
             test_loss = self.test_model()
             print(f"EPOCH: {epoch + 1}/{num_epochs} TRAIN LOSS: {train_loss} TEST LOSS: {test_loss}")
-
+            if best_loss >= test_loss:
+                best_loss = test_loss
+                torch.save(self.model.state_dict(), "pth_models/best_model.pth")
