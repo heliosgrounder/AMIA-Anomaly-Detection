@@ -5,7 +5,7 @@ import torchvision
 
 class FasterRCNN(nn.Module):
     def __init__(self, num_classes=14, pretrained=True):
-        super(self, FasterRCNN).__init__()
+        super(FasterRCNN, self).__init__()
 
         self.num_classes = num_classes
         self.pretrained = pretrained
