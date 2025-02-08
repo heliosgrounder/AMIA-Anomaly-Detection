@@ -110,9 +110,8 @@ class AMIADataset(Dataset):
 
                 labels = torch.tensor(labels, dtype=torch.int64)
                 boxes = torch.tensor(boxes, dtype=torch.float32)
-                
 
-            # boxes = BoundingBoxes(boxes, format="xyxy", canvas_size=torch.Size(self.__IMAGE_SIZE))
+            boxes = BoundingBoxes(boxes, format="xyxy", canvas_size=torch.Size((self.__IMAGE_SIZE, self.__IMAGE_SIZE)))
 
             # transform part
             if self.transform:
