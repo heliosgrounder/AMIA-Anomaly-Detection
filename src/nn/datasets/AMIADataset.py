@@ -29,6 +29,7 @@ class AMIADataset(Dataset):
 
         # annotations hashtable
         self.df_annotations = pd.read_csv(os.path.join(data_folder, f"{folder}.csv"))
+        self.df_annotations["class_id"] = self.df_annotations["class_id"].apply(lambda x: x + 1 if x != 14 else 0)
         if self.train:
             results = []
             for (image_id, class_id), group in self.df_annotations.groupby(["image_id", "class_id"]):
@@ -87,8 +88,8 @@ class AMIADataset(Dataset):
         if self.train:
             annotations = self.df_annotations.loc[[image_uuid]]
 
-            if set(annotations["class_id"]) == {14}:
-                labels = torch.tensor([14], dtype=torch.int64)
+            if set(annotations["class_id"]) == {0}:
+                labels = torch.tensor([0], dtype=torch.int64)
                 boxes = torch.empty((0, 4), dtype=torch.float32)
             else:
                 # merged_annotations = (
