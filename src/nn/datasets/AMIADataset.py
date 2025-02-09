@@ -29,8 +29,8 @@ class AMIADataset(Dataset):
 
         # annotations hashtable
         self.df_annotations = pd.read_csv(os.path.join(data_folder, f"{folder}.csv"))
-        self.df_annotations["class_id"] = self.df_annotations["class_id"].apply(lambda x: x + 1 if x != 14 else 0)
         if self.train:
+            self.df_annotations["class_id"] = self.df_annotations["class_id"].apply(lambda x: x + 1 if x != 14 else 0)
             results = []
             for (image_id, class_id), group in self.df_annotations.groupby(["image_id", "class_id"]):
                 if group[["x_min", "y_min", "x_max", "y_max"]].isna().all().all():
@@ -63,10 +63,10 @@ class AMIADataset(Dataset):
                 "y_max": "float32"
             })
         
-        # resize bboxes
-        for column in ("x_min", "y_min", "x_max", "y_max"):
-            dim = "dim0" if column[0] == "x" else "dim1"
-            self.df_annotations[column] = self.df_annotations.apply(lambda x: x[column] / self.df_img_size.loc[x["image_id"]][dim] * 1024, axis=1)
+            # resize bboxes
+            for column in ("x_min", "y_min", "x_max", "y_max"):
+                dim = "dim0" if column[0] == "x" else "dim1"
+                self.df_annotations[column] = self.df_annotations.apply(lambda x: x[column] / self.df_img_size.loc[x["image_id"]][dim] * 1024, axis=1)
 
         self.df_annotations.set_index(__KEY, inplace=True)
 
