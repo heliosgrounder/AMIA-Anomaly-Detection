@@ -20,7 +20,7 @@ class Trainer:
         self.model = FasterRCNN()
         self.model = self.model.to(self.device)
 
-        self.batch_size=batch_size
+        self.batch_size = batch_size
         self.learning_rate = learning_rate
         
         self.dataset = AMIADataset(
@@ -96,3 +96,4 @@ class Trainer:
             if best_loss >= test_loss:
                 best_loss = test_loss
                 torch.save(self.model.state_dict(), "pth_models/best_model.pth")
+                print(f"BEST MODEL IN {epoch+1} EPOCH")
