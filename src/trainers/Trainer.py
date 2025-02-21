@@ -42,6 +42,7 @@ class Trainer:
         
         self.dataset = AMIADataset(
             transform=get_transform(),
+            no_findings=True if self.model_type == "FasterRCNN" else False
         )
         train_size = int(0.8 * len(self.dataset))
         test_size = len(self.dataset) - train_size

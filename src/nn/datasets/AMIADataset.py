@@ -12,12 +12,13 @@ from src.utils.utils import merge_bbox
 
 
 class AMIADataset(Dataset):
-    def __init__(self, data_folder="data", transform=None, train=True):
+    def __init__(self, data_folder="data", transform=None, train=True, no_findings=True):
         __KEY = "image_id"
         self.__IMAGE_SIZE = 1024
         self.data_folder = data_folder
         self.transform = transform
         self.train = train
+        self.no_findings = no_findings
         if self.train:
             folder = "train"
         else:
@@ -89,7 +90,7 @@ class AMIADataset(Dataset):
             annotations = self.df_annotations.loc[[image_uuid]]
 
             if set(annotations["class_id"]) == {0}:
-                labels = torch.tensor([0], dtype=torch.int64)
+                labels = torch.tensor([0], dtype=torch.int64) if self.no_findings else torch.empty((0,), dtype=torch.int64)
                 boxes = torch.empty((0, 4), dtype=torch.float32)
             else:
                 # merged_annotations = (
@@ -106,7 +107,7 @@ class AMIADataset(Dataset):
                 labels = []
                 boxes = []
                 for _, row in annotations.iterrows():
-                    labels.append(int(row["class_id"]))
+                    labels.append(int(row["class_id"]) - int(not self.no_findings))
                     boxes.append([row["x_min"], row["y_min"], row["x_max"], row["y_max"]])
 
                 labels = torch.tensor(labels, dtype=torch.int64)
@@ -133,5 +134,6 @@ class AMIADataset(Dataset):
 
 def get_transform():
     return T.Compose([
-        T.ToTensor()
+        T.ToTensor(),
+        T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
