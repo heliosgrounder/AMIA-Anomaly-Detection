@@ -18,4 +18,10 @@ LABELS = {
     14: "Pulmonary fibrosis",
 }
 
+MODEL_TYPES = {
+    0: "FasterRCNN",
+    1: "YOLOv1",
+    2: "RetinaNet"
+}
+
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
