@@ -4,20 +4,37 @@ from torch.utils.data import DataLoader, Subset
 
 from tqdm import tqdm
 
+from src.nn.config import Config
+
 from src.nn.models.FasterRCNN import FasterRCNN
+from src.nn.models.yolo import YOLOv1
+from src.nn.models.retinanet import RetinaNet
+
 from src.nn.datasets.AMIADataset import AMIADataset, get_transform
-from src.utils.constants import DEVICE
 from src.utils.utils import collate_fn
+
+CONFIG = Config()
+
 
 class Trainer:
     def __init__(self, 
-                 batch_size=8, 
-                 learning_rate=5e-3,
-                 device=DEVICE, 
+                 batch_size=CONFIG.batch_size, 
+                 learning_rate=CONFIG.learning_rate,
+                 device=CONFIG.device, 
+                 model_type=CONFIG.model_type,
                  examination=False):
-        self.device = device
 
-        self.model = FasterRCNN()
+        self.device = device
+        self.model_type = model_type
+
+        if self.model_type == 0:
+            self.model = FasterRCNN()
+        elif self.model_type == 1:
+            self.model = YOLOv1()
+        elif self.model_type == 2:
+            self.model = RetinaNet()
+        else:
+            raise Exception("Dont have model with this code. Try Again.")
         self.model = self.model.to(self.device)
 
         self.batch_size = batch_size
@@ -48,7 +65,8 @@ class Trainer:
             collate_fn=collate_fn
         )
 
-        self.optimizer = optim.SGD(self.model.parameters(), lr=self.learning_rate, momentum=0.9, weight_decay=5e-4)
+        # self.optimizer = optim.SGD(self.model.parameters(), lr=self.learning_rate, momentum=0.9, weight_decay=5e-4)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=CONFIG.weight_decay)
 
     def train_model(self):
         self.model.train()
@@ -87,7 +105,7 @@ class Trainer:
         avg_loss = running_loss / len(self.test_loader)
         return avg_loss
 
-    def fit(self, num_epochs=10):
+    def fit(self, num_epochs=CONFIG.num_epochs):
         best_loss = float("inf")
         for epoch in range(num_epochs):
             train_loss = self.train_model()
@@ -95,5 +113,5 @@ class Trainer:
             print(f"EPOCH: {epoch + 1}/{num_epochs} TRAIN LOSS: {train_loss} TEST LOSS: {test_loss}")
             if best_loss >= test_loss:
                 best_loss = test_loss
-                torch.save(self.model.state_dict(), "pth_models/best_model.pth")
+                torch.save(self.model.state_dict(), f"pth_models/{CONFIG.model_name}.pth")
                 print(f"BEST MODEL IN {epoch+1} EPOCH")
