@@ -27,11 +27,11 @@ class Trainer:
         self.device = device
         self.model_type = model_type
 
-        if self.model_type == 0:
+        if self.model_type == "FasterRCNN":
             self.model = FasterRCNN()
-        elif self.model_type == 1:
+        elif self.model_type == "YOLOv1":
             self.model = YOLOv1()
-        elif self.model_type == 2:
+        elif self.model_type == "RetinaNet":
             self.model = RetinaNet()
         else:
             raise Exception("Dont have model with this code. Try Again.")
