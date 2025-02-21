@@ -5,7 +5,7 @@ from torchvision.models.detection.retinanet import RetinaNetClassificationHead
 
 
 class RetinaNet(nn.Module):
-    def __init__(self, num_classes=14, pretrained=True):
+    def __init__(self, num_classes=15, pretrained=True):
         super(RetinaNet, self).__init__()
         
         self.num_classes = num_classes
