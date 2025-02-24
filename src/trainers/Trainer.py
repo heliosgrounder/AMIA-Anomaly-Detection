@@ -10,7 +10,7 @@ from src.nn.models.FasterRCNN import FasterRCNN
 from src.nn.models.yolo import YOLOv1
 from src.nn.models.retinanet import RetinaNet
 
-from src.nn.datasets.AMIADataset import AMIADataset, get_transform
+from src.nn.datasets.AMIADataset import AMIADataset, get_transform, get_train_transform
 from src.utils.utils import collate_fn
 
 CONFIG = Config()
@@ -41,7 +41,7 @@ class Trainer:
         self.learning_rate = learning_rate
         
         self.dataset = AMIADataset(
-            transform=get_transform(),
+            transform=get_train_transform(),
             no_findings=True if self.model_type == "FasterRCNN" else False
         )
         train_size = int(0.8 * len(self.dataset))

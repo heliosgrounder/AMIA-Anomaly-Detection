@@ -90,6 +90,7 @@ ENV/
 
 # Project ignores
 data/
+val.ipynb
 test.ipynb
 best_model.pth
 submission.csv
