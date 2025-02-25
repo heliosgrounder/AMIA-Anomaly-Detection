@@ -3,8 +3,9 @@ from src.utils.constants import DEVICE, MODEL_TYPES
 
 class Config:
     def __init__(self):
-        self.model_name = "best_model_augmentation_2"
+        self.model_name = "best_model_augmentation_4"
 
+        self.folds = 5
         self.num_epochs = 25
         self.batch_size = 8
         self.learning_rate = 1e-4

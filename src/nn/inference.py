@@ -13,7 +13,7 @@ def run(model,
 
     with torch.no_grad():
         for images, uuids in tqdm(data_loader):
-            images = list(img["image"].to(device) for img in images)
+            images = list(img.to(device) for img in images)
             outputs = model(images)
 
             processed = []

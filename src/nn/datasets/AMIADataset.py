@@ -35,7 +35,7 @@ class AMIADataset(Dataset):
         # annotations hashtable
         self.df_annotations = pd.read_csv(os.path.join(data_folder, f"{folder}.csv"))
         if self.train:
-            # self.df_annotations["class_id"] = self.df_annotations["class_id"].apply(lambda x: x + 1 if x != 14 else 0)
+            self.df_annotations["class_id"] = self.df_annotations["class_id"].apply(lambda x: x + 1 if x != 14 else 0)
             results = []
             for (image_id, class_id), group in self.df_annotations.groupby(["image_id", "class_id"]):
                 if group[["x_min", "y_min", "x_max", "y_max"]].isna().all().all():
@@ -77,11 +77,8 @@ class AMIADataset(Dataset):
 
         self.images_path = []
         for image_filename in os.listdir(os.path.join(data_folder, folder, folder)):
-            image_uuid = Path(image_filename).stem
-            annotations = self.df_annotations.loc[[image_uuid]]
-            if set(annotations["class_id"]) != {14}:
-                image_path = os.path.join(data_folder, folder, folder, image_filename)
-                self.images_path.append(image_path)
+            image_path = os.path.join(data_folder, folder, folder, image_filename)
+            self.images_path.append(image_path)
 
     def __len__(self):
         return len(self.images_path)
@@ -91,12 +88,11 @@ class AMIADataset(Dataset):
         image_uuid = os.path.splitext(os.path.basename(image_path))[0]
 
         image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB).astype(np.float32)
-        image /= 255.0
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
 
         annotations = self.df_annotations.loc[[image_uuid]]
 
-        if set(annotations["class_id"]) == {14}:
+        if set(annotations["class_id"]) == {0}:
             labels = torch.tensor([0], dtype=torch.int64) if self.no_findings else torch.empty((0,), dtype=torch.int64)
             boxes = torch.empty((0, 4), dtype=torch.float32)
         else:
@@ -108,17 +104,6 @@ class AMIADataset(Dataset):
 
             labels = torch.tensor(labels, dtype=torch.int64)
             boxes = torch.tensor(boxes, dtype=torch.float32)
-
-            # if self.transform:
-            #     transformed = self.transform(
-            #         image=image, 
-            #         bboxes=boxes.numpy(),
-            #         labels=labels.numpy()
-            #     )
-
-            # image = transformed["image"]
-            # boxes = torch.from_numpy(transformed["bboxes"])
-            # labels = torch.tensor(transformed["labels"], dtype=torch.int64)
 
         return image, boxes, labels
         
@@ -180,12 +165,14 @@ class AMIADataset(Dataset):
 
     def __getitem__(self, idx):
         if self.train:
-            if random.random() > 0.33:
-                image, boxes, labels = self.get_images(idx)
-            elif random.random() > 0.5:
-                image, boxes, labels = self.get_mixup(idx)
-            else:
-                image, boxes, labels = self.get_cutmix(idx)
+            # if random.random() > 0.33:
+            #     image, boxes, labels = self.get_images(idx)
+            # elif random.random() > 0.5:
+            #     image, boxes, labels = self.get_mixup(idx)
+            # else:
+            #     image, boxes, labels = self.get_cutmix(idx)
+
+            image, boxes, labels = self.get_images(idx)
 
             if self.transform:
                 transformed = self.transform(
@@ -197,11 +184,11 @@ class AMIADataset(Dataset):
                 image = transformed["image"]
                 boxes = torch.from_numpy(transformed["bboxes"])
                 labels = torch.tensor(transformed["labels"], dtype=torch.int64)
-
-            resize = T.Compose([
-                T.ToTensor()
-            ])
-            image = resize(image)
+            else:
+                totensor = T.Compose([
+                    T.ToTensor()
+                ])
+                image = totensor(image)
 
             target = {
                 "boxes": boxes,
@@ -214,10 +201,15 @@ class AMIADataset(Dataset):
             image_uuid = os.path.splitext(os.path.basename(image_path))[0]
 
             image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
-            image /= 255.0
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            # image /= 255.0
             if self.transform:
                 image = self.transform(image=image)
+            else:
+                totensor = T.Compose([
+                    T.ToTensor()
+                ])
+                image = totensor(image)
             return image, image_uuid
 
 
@@ -246,6 +238,7 @@ def get_train_transform():
             A.Transpose(p=0.5),
             A.Resize(width=1024, height=1024, p=1.0),
             A.CoarseDropout(num_holes_range=(8, 12), hole_height_range=(32, 64), hole_width_range=(32, 64), fill=0, p=0.5),
+            A.Normalize(),
             A.ToTensorV2(p=1.0)
         ], 
         p=1.0,
@@ -260,6 +253,7 @@ def get_validation_transform():
     return A.Compose(
         [
             A.Resize(width=1024, height=1024, p=1.0),
+            A.Normalize(),
             A.ToTensorV2(p=1.0) 
         ],
         p=1.0
