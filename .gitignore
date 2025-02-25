@@ -92,6 +92,7 @@ ENV/
 data/
 val.ipynb
 test.ipynb
+main.ipynb
 best_model.pth
 submission.csv
 pth_models/

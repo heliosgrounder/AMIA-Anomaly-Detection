@@ -41,7 +41,7 @@ class Trainer:
         self.learning_rate = learning_rate
         
         self.dataset = AMIADataset(
-            transform=get_train_transform(),
+            # transform=get_train_transform(),
             no_findings=True if self.model_type == "FasterRCNN" else False
         )
         train_size = int(0.8 * len(self.dataset))

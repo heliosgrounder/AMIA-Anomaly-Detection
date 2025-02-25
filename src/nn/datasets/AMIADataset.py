@@ -1,13 +1,13 @@
 import os
+from pathlib import Path
+import random
+
 import numpy as np
 import pandas as pd
-from PIL import Image
-
 import cv2
 
 import torch
 from torch.utils.data import Dataset
-from torchvision.tv_tensors import BoundingBoxes
 
 import albumentations as A
 import torchvision.transforms as T
@@ -35,7 +35,7 @@ class AMIADataset(Dataset):
         # annotations hashtable
         self.df_annotations = pd.read_csv(os.path.join(data_folder, f"{folder}.csv"))
         if self.train:
-            self.df_annotations["class_id"] = self.df_annotations["class_id"].apply(lambda x: x + 1 if x != 14 else 0)
+            # self.df_annotations["class_id"] = self.df_annotations["class_id"].apply(lambda x: x + 1 if x != 14 else 0)
             results = []
             for (image_id, class_id), group in self.df_annotations.groupby(["image_id", "class_id"]):
                 if group[["x_min", "y_min", "x_max", "y_max"]].isna().all().all():
@@ -77,82 +77,145 @@ class AMIADataset(Dataset):
 
         self.images_path = []
         for image_filename in os.listdir(os.path.join(data_folder, folder, folder)):
-            image_path = os.path.join(data_folder, folder, folder, image_filename)
-            self.images_path.append(image_path)
+            image_uuid = Path(image_filename).stem
+            annotations = self.df_annotations.loc[[image_uuid]]
+            if set(annotations["class_id"]) != {14}:
+                image_path = os.path.join(data_folder, folder, folder, image_filename)
+                self.images_path.append(image_path)
 
     def __len__(self):
         return len(self.images_path)
 
-    def __getitem__(self, idx):
+    def get_images(self, idx):
         image_path = self.images_path[idx]
         image_uuid = os.path.splitext(os.path.basename(image_path))[0]
-        # img_size = self.df_img_size.loc[image_uuid].to_list()
 
-        # image = Image.open(image_path).convert("RGB")
         image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB).astype(np.float32)
+        image /= 255.0
 
+        annotations = self.df_annotations.loc[[image_uuid]]
+
+        if set(annotations["class_id"]) == {14}:
+            labels = torch.tensor([0], dtype=torch.int64) if self.no_findings else torch.empty((0,), dtype=torch.int64)
+            boxes = torch.empty((0, 4), dtype=torch.float32)
+        else:
+            labels = []
+            boxes = []
+            for _, row in annotations.iterrows():
+                labels.append(int(row["class_id"]) - int(not self.no_findings))
+                boxes.append([row["x_min"], row["y_min"], row["x_max"], row["y_max"]])
+
+            labels = torch.tensor(labels, dtype=torch.int64)
+            boxes = torch.tensor(boxes, dtype=torch.float32)
+
+            # if self.transform:
+            #     transformed = self.transform(
+            #         image=image, 
+            #         bboxes=boxes.numpy(),
+            #         labels=labels.numpy()
+            #     )
+
+            # image = transformed["image"]
+            # boxes = torch.from_numpy(transformed["bboxes"])
+            # labels = torch.tensor(transformed["labels"], dtype=torch.int64)
+
+        return image, boxes, labels
+        
+    def get_mixup(self, idx):
+        image, boxes, labels = self.get_images(idx)
+        random_image, random_boxes, random_labels = self.get_images(random.randint(0, len(self.images_path) - 1))
+
+        fused_boxes = torch.cat((boxes, random_boxes))
+        fused_labels = torch.cat((labels, random_labels))
+
+        return (image + random_image) / 2, fused_boxes, fused_labels
+    
+    def get_cutmix(self, idx):
+        half_size = self.__IMAGE_SIZE // 2
+        x_center, y_center = [int(random.uniform(self.__IMAGE_SIZE * 0.25, self.__IMAGE_SIZE * 0.75)) for _ in range(2)]
+        indexes = [idx] + [random.randint(0, len(self.images_path) - 1) for _ in range(3)]
+
+        result_image = np.full((self.__IMAGE_SIZE, self.__IMAGE_SIZE, 3), 1, dtype=np.float32)
+        result_boxes = torch.empty((0, 4), dtype=torch.float32)
+        result_labels = torch.empty((0,), dtype=torch.int64)
+
+        for i, index in enumerate(indexes):
+            image, boxes, labels = self.get_images(index)
+            if i == 0:
+                x_min_1, y_min_1, x_max_1, y_max_1 = max(x_center - self.__IMAGE_SIZE, 0), max(y_center - self.__IMAGE_SIZE, 0), x_center, y_center
+                x_min_2, y_min_2, x_max_2, y_max_2 = self.__IMAGE_SIZE - (x_max_1 - x_min_1), self.__IMAGE_SIZE - (y_max_1 - y_min_1), self.__IMAGE_SIZE, self.__IMAGE_SIZE
+            elif i == 1:
+                x_min_1, y_min_1, x_max_1, y_max_1 = x_center, max(y_center - self.__IMAGE_SIZE, 0), min(x_center + self.__IMAGE_SIZE, half_size * 2), self.__IMAGE_SIZE
+                x_min_2, y_min_2, x_max_2, y_max_2 = 0, self.__IMAGE_SIZE - (y_max_1 - y_min_1), min(self.__IMAGE_SIZE, x_max_1 - x_min_1), self.__IMAGE_SIZE
+            elif i == 2:
+                x_min_1, y_min_1, x_max_1, y_max_1 = max(x_center - self.__IMAGE_SIZE, 0), y_center, x_center, min(half_size * 2, y_center + self.__IMAGE_SIZE)
+                x_min_2, y_min_2, x_max_2, y_max_2 = self.__IMAGE_SIZE - (x_max_1 - x_min_1), 0, max(x_center, self.__IMAGE_SIZE), min(y_max_1 - y_min_1, self.__IMAGE_SIZE)
+            elif i == 3:
+                x_min_1, y_min_1, x_max_1, y_max_1 = x_center, y_center, min(x_center + self.__IMAGE_SIZE, half_size * 2), min(half_size * 2, y_center + self.__IMAGE_SIZE)
+                x_min_2, y_min_2, x_max_2, y_max_2 = 0, 0, min(self.__IMAGE_SIZE, x_max_1 - x_min_1), min(y_max_1 - y_min_1, self.__IMAGE_SIZE)
+            
+            result_image[y_min_1:y_max_1, x_min_1:x_max_1] = image[y_min_2:y_max_2, x_min_2:x_max_2]
+            padding_w = x_min_1 - x_min_2
+            padding_h = y_min_1 - y_min_2
+
+            boxes[:, 0] += padding_w
+            boxes[:, 1] += padding_h
+            boxes[:, 2] += padding_w
+            boxes[:, 3] += padding_h
+
+            result_boxes = torch.cat((result_boxes, boxes))
+            result_labels = torch.cat((result_labels, labels))
+
+        result_boxes = result_boxes.numpy()
+        np.clip(result_boxes[:, 0:], 0, 2 * half_size, out=result_boxes[:, 0:])
+        result_boxes = result_boxes.astype(np.int32)
+        index_to_use = np.where((result_boxes[:,2]-result_boxes[:,0])*(result_boxes[:,3]-result_boxes[:,1]) > 0)
+
+        result_boxes = torch.from_numpy(result_boxes[index_to_use])
+        result_labels = result_labels[index_to_use]
+        
+        return result_image, result_boxes, result_labels
+
+
+    def __getitem__(self, idx):
         if self.train:
-            annotations = self.df_annotations.loc[[image_uuid]]
-
-            if set(annotations["class_id"]) == {0}:
-                labels = torch.tensor([0], dtype=torch.int64) if self.no_findings else torch.empty((0,), dtype=torch.int64)
-                boxes = torch.empty((0, 4), dtype=torch.float32)
+            if random.random() > 0.33:
+                image, boxes, labels = self.get_images(idx)
+            elif random.random() > 0.5:
+                image, boxes, labels = self.get_mixup(idx)
             else:
-                # merged_annotations = (
-                #     annotations.groupby("class_id")
-                #     .agg({
-                #         "x_min": "mean",
-                #         "y_min": "mean",
-                #         "x_max": "mean",
-                #         "y_max": "mean"
-                #     })
-                #     .reset_index()
-                # )
+                image, boxes, labels = self.get_cutmix(idx)
 
-                labels = []
-                boxes = []
-                for _, row in annotations.iterrows():
-                    labels.append(int(row["class_id"]) - int(not self.no_findings))
-                    boxes.append([row["x_min"], row["y_min"], row["x_max"], row["y_max"]])
-
-                labels = torch.tensor(labels, dtype=torch.int64)
-                boxes = torch.tensor(boxes, dtype=torch.float32)
-
-            # boxes = BoundingBoxes(boxes, format="xyxy", canvas_size=torch.Size((self.__IMAGE_SIZE, self.__IMAGE_SIZE)))
-            # print(boxes.numpy())
-            # print(labels.numpy())
-
-            # print(boxes)
-
-            # transform part
             if self.transform:
-                # image = self.transform(image)
                 transformed = self.transform(
                     image=image, 
                     bboxes=boxes.numpy(),
                     labels=labels.numpy()
                 )
+                
+                image = transformed["image"]
+                boxes = torch.from_numpy(transformed["bboxes"])
+                labels = torch.tensor(transformed["labels"], dtype=torch.int64)
 
-            # target = {
-            #     "boxes": boxes,
-            #     "labels": labels,
-            #     # "image_uuid": torch.tensor([image_uuid])
-            # }
-            
-
-            image = transformed["image"]
-            boxes = torch.from_numpy(transformed["bboxes"])
-            labels = torch.tensor(transformed["labels"], dtype=torch.int64)
+            resize = T.Compose([
+                T.ToTensor()
+            ])
+            image = resize(image)
 
             target = {
                 "boxes": boxes,
                 "labels": labels,
-                # "image_uuid": torcsh.tensor([image_uuid])
             }
-        
+
             return image, target
         else:
+            image_path = self.images_path[idx]
+            image_uuid = os.path.splitext(os.path.basename(image_path))[0]
+
+            image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
+            image /= 255.0
             if self.transform:
                 image = self.transform(image=image)
             return image, image_uuid
@@ -183,7 +246,6 @@ def get_train_transform():
             A.Transpose(p=0.5),
             A.Resize(width=1024, height=1024, p=1.0),
             A.CoarseDropout(num_holes_range=(8, 12), hole_height_range=(32, 64), hole_width_range=(32, 64), fill=0, p=0.5),
-            A.Normalize(),
             A.ToTensorV2(p=1.0)
         ], 
         p=1.0,
@@ -198,7 +260,6 @@ def get_validation_transform():
     return A.Compose(
         [
             A.Resize(width=1024, height=1024, p=1.0),
-            A.Normalize(),
             A.ToTensorV2(p=1.0) 
         ],
         p=1.0
