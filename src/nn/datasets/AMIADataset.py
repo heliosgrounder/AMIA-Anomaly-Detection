@@ -201,7 +201,7 @@ class AMIADataset(Dataset):
             image_uuid = os.path.splitext(os.path.basename(image_path))[0]
 
             image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
             # image /= 255.0
             if self.transform:
                 image = self.transform(image=image)
