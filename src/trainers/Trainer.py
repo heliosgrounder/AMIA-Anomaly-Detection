@@ -4,6 +4,8 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader, Subset
 
+from torchmetrics.detection import MeanAveragePrecision
+
 from tqdm import tqdm
 
 from src.nn.config import Config
@@ -30,11 +32,11 @@ class Trainer:
         self.model_type = model_type
 
         if self.model_type == "FasterRCNN":
-            self.model = FasterRCNN()
+            self.model = FasterRCNN(v1=True)
         elif self.model_type == "YOLOv1":
             self.model = YOLOv1()
         elif self.model_type == "RetinaNet":
-            self.model = RetinaNet()
+            self.model = RetinaNet(num_classes=15)
         else:
             raise Exception("Dont have model with this code. Try Again.")
         self.model = self.model.to(self.device)
@@ -101,23 +103,31 @@ class Trainer:
 
     @torch.no_grad()
     def test_model(self):
-        self.model.train()
+        self.model.eval()
+        metric = MeanAveragePrecision(iou_thresholds=[0.4])
 
-        running_loss = 0.0
+        # running_loss = 0.0
         for images, targets in tqdm(self.test_loader, desc="Testing"):
             images = list(img.to(self.device) for img in images)
             targets = [{k: v.to(self.device) for k, v in t.items()} for t in targets]
 
-            loss_dict = self.model(images, targets)
-            losses = sum(loss for loss in loss_dict.values())
+            outputs = self.model(images)
+            print(outputs)
+            print(targets)
+            metric.update(outputs, targets)
+            # losses = sum(loss for loss in loss_dict.values())
 
-            running_loss += losses.item()
+            # running_loss += losses.item()
+
+        results = metric.compute()
+        map_score = results["map"]
+        print(results)
         
-        avg_loss = running_loss / len(self.test_loader)
-        return avg_loss
+        # avg_loss = running_loss / len(self.test_loader)
+        return map_score
 
     def fit(self, num_epochs=CONFIG.num_epochs):
-        best_loss = float("inf")
+        best_loss = 0
         for fold, (train_ids, test_ids) in enumerate(self.kfolds.split(self.dataset)):
             print(f"Fold {fold+1}/{CONFIG.folds}")
             self.train_sampler = torch.utils.data.SubsetRandomSampler(train_ids)
@@ -141,7 +151,7 @@ class Trainer:
                 train_loss = self.train_model()
                 test_loss = self.test_model()
                 print(f"EPOCH: {epoch + 1}/{num_epochs} TRAIN LOSS: {train_loss} TEST LOSS: {test_loss}")
-                if best_loss >= test_loss:
+                if best_loss <= test_loss:
                     best_loss = test_loss
                     torch.save(self.model.state_dict(), f"pth_models/{CONFIG.model_name}.pth")
                     print(f"BEST MODEL IN {epoch+1} EPOCH and {fold+1} FOLD")
