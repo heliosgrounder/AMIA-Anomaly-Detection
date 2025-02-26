@@ -46,7 +46,7 @@ class Trainer:
         
         self.dataset = AMIADataset(
             transform=get_train_transform(),
-            no_findings=True if self.model_type == "FasterRCNN" else False
+            # no_findings=True if self.model_type == "FasterRCNN" else False
         )
 
         if examination:
@@ -112,8 +112,8 @@ class Trainer:
             targets = [{k: v.to(self.device) for k, v in t.items()} for t in targets]
 
             outputs = self.model(images)
-            print(outputs)
-            print(targets)
+            # print(outputs)
+            # print(targets)
             metric.update(outputs, targets)
             # losses = sum(loss for loss in loss_dict.values())
 
@@ -121,7 +121,7 @@ class Trainer:
 
         results = metric.compute()
         map_score = results["map"]
-        print(results)
+        # print(results)
         
         # avg_loss = running_loss / len(self.test_loader)
         return map_score
